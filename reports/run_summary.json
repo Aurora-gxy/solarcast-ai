@@ -1,0 +1,20 @@
+{
+  "best_model": "attention",
+  "best_seed": 4,
+  "n_train": 3836,
+  "n_val": 1031,
+  "n_test": 1600,
+  "test_period": [
+    "2013-07-10",
+    "2019-12-24"
+  ],
+  "macro_rmse_seed_std": {
+    "Attention MLP": 0.0937816145714402,
+    "Multi-output MLP": 0.07014725627325766
+  },
+  "mean_train_seconds": {
+    "Attention MLP": 2.61,
+    "Multi-output MLP": 1.1
+  },
+  "trained_at": "2026-10-03T17:51:12.611333+00:00"
+}

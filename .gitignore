@@ -1,0 +1,27 @@
+# OS / editor
+.DS_Store
+__MACOSX/
+.ipynb_checkpoints/
+__pycache__/
+*.egg-info/
+.venv/
+.vscode/
+.idea/
+
+# Data and model artefacts (raw data may be licence-restricted)
+data/raw/
+data/processed/
+models/*.pt
+models/*.joblib
+
+# Secrets
+.env
+
+# Private notes / original coursework
+*.docx
+notebooks/solarcast.ipynb
+.pytest_cache/
+
+# Local agent tooling
+.agents/
+.claude/
