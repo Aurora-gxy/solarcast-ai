@@ -2,14 +2,15 @@
 
 Seven-day solar radiation forecasting for Sydney, with honest baselines and checked uncertainty.
 
+**Live demo: [solarcast-sydney.streamlit.app](https://solarcast-sydney.streamlit.app)**
+
 [![CI](https://github.com/Aurora-gxy/solarcast-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/Aurora-gxy/solarcast-ai/actions/workflows/ci.yml)
 
 The dashboard has two modes: **Live**, which pulls today's weather forecast and predicts
 today plus the next six days, and **Replay**, which shows what the model would have said
 on any past date next to what actually happened.
 
-> Status: work in progress. Online deployment, product documents and the natural-language
-> summary are not yet included.
+> Status: deployed. Product documents and the natural-language summary are not yet included.
 
 ## Key result
 
