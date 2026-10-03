@@ -1,0 +1,57 @@
+{
+  "site": {
+    "name": "Sydney",
+    "latitude": -33.87,
+    "longitude": 151.21,
+    "timezone": "Australia/Sydney"
+  },
+  "downloaded_on": "2026-10-04",
+  "end_date": "2026-09-27",
+  "source": "Open-Meteo.com (CC BY 4.0)",
+  "models": {
+    "best_match": {
+      "rows": 1001,
+      "radiation_coverage_by_lead": {
+        "lead1": 0.981,
+        "lead2": 0.98,
+        "lead3": 0.979,
+        "lead4": 0.978,
+        "lead5": 0.977,
+        "lead6": 0.976,
+        "lead7": 0.975
+      },
+      "first_day_with_all_leads": "2024-01-26"
+    },
+    "gfs_seamless": {
+      "rows": 1001,
+      "radiation_coverage_by_lead": {
+        "lead1": 0.981,
+        "lead2": 0.98,
+        "lead3": 0.979,
+        "lead4": 0.978,
+        "lead5": 0.977,
+        "lead6": 0.976,
+        "lead7": 0.975
+      },
+      "first_day_with_all_leads": "2024-01-26"
+    },
+    "ecmwf_ifs025": {
+      "rows": 1001,
+      "radiation_coverage_by_lead": {
+        "lead1": 0.934,
+        "lead2": 0.933,
+        "lead3": 0.931,
+        "lead4": 0.93,
+        "lead5": 0.929,
+        "lead6": 0.928,
+        "lead7": 0.927
+      },
+      "first_day_with_all_leads": "2024-03-14"
+    }
+  },
+  "observed": {
+    "rows": 9767,
+    "missing_radiation_days": 0,
+    "mean_radiation_MJ_m2": 16.83
+  }
+}

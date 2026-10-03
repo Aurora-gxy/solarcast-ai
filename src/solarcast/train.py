@@ -18,9 +18,9 @@ import torch
 from torch import nn
 
 from .config import load_config
-from .data import load_daily
+from .dataset import build_dataset
 from .evaluate import add_skill, evaluate, interval_metrics, summary_table
-from .features import build_features, feature_names, make_splits, target_names
+from .features import feature_names, target_names
 from .models import build_model
 from .predict import Forecaster
 
@@ -65,9 +65,7 @@ def main(config_path: str = "configs/config.yaml") -> pd.DataFrame:
     reports.mkdir(parents=True, exist_ok=True)
     models_dir.mkdir(parents=True, exist_ok=True)
 
-    daily = load_daily(cfg)
-    frame = build_features(daily, fcfg["n_lags"], fcfg["rolling_window"], fcfg["horizons"])
-    splits = make_splits(frame, cfg)
+    _, _, splits = build_dataset(cfg)
     X_cols, y_cols = feature_names(fcfg["n_lags"]), target_names(fcfg["horizons"])
 
     # Scaling statistics come from the training set only.

@@ -7,12 +7,13 @@ from pathlib import Path
 
 import pandas as pd
 
-from .baselines import Climatology, XGBMultiHorizon, fit_ridge, persistence_predict
+from .baselines import XGBMultiHorizon, fit_ridge, persistence_predict
 from .config import load_config
-from .data import load_daily
-from .evaluate import add_skill, evaluate, summary_table
-from .features import build_features, feature_names, make_splits, target_names
+from .dataset import build_dataset, uses_weather
+from .evaluate import add_skill, evaluate, interval_metrics, summary_table
+from .features import feature_names, target_names
 from .validation import quality_report
+from .weather import WeatherRidge, clim_columns, fit_climatology, nwp_columns, nwp_direct_predict
 
 
 def main(config_path: str = "configs/config.yaml") -> pd.DataFrame:
@@ -20,15 +21,11 @@ def main(config_path: str = "configs/config.yaml") -> pd.DataFrame:
     reports = Path(cfg["reports_dir"])
     reports.mkdir(parents=True, exist_ok=True)
 
-    # Step 1: data
-    daily = load_daily(cfg)
+    # Steps 1-2: data, features and time-ordered split
+    fcfg = cfg["features"]
+    daily, frame, splits = build_dataset(cfg)
     report = quality_report(daily)
     (reports / "data_quality.json").write_text(json.dumps(report, indent=2))
-
-    # Step 2: features and time-ordered split
-    fcfg = cfg["features"]
-    frame = build_features(daily, fcfg["n_lags"], fcfg["rolling_window"], fcfg["horizons"])
-    splits = make_splits(frame, cfg)
     print(f"Samples  train={len(splits.train)}  val={len(splits.val)}  test={len(splits.test)}")
 
     # Step 3: baselines, all scored on the same test samples
@@ -39,9 +36,8 @@ def main(config_path: str = "configs/config.yaml") -> pd.DataFrame:
 
     results.append(evaluate(y_test, persistence_predict(splits.test), "Persistence"))
 
-    train_obs = daily.loc[: cfg["split"]["train_end"], "solar_obs"]
-    clim = Climatology(bcfg["climatology_smooth_days"]).fit(train_obs)
-    results.append(evaluate(y_test, clim.predict(splits.test.index), "Climatology"))
+    clim = fit_climatology(daily, cfg)
+    results.append(evaluate(y_test, clim.predict(splits.test.index, fcfg["horizons"]), "Climatology"))
 
     ridge, alpha = fit_ridge(splits.train, splits.val, bcfg["ridge_alphas"])
     print(f"Ridge alpha chosen on validation: {alpha}")
@@ -49,6 +45,26 @@ def main(config_path: str = "configs/config.yaml") -> pd.DataFrame:
 
     xgb = XGBMultiHorizon(bcfg["xgboost"], cfg["seed"]).fit(splits.train, splits.val)
     results.append(evaluate(y_test, xgb.predict(splits.test), "XGBoost"))
+
+    # Weather-aware models: only when archived weather forecasts are configured
+    if uses_weather(cfg):
+        results.append(evaluate(y_test, nwp_direct_predict(splits.test, fcfg["horizons"]), "NWP direct"))
+
+        needed = nwp_columns(fcfg["horizons"]) + clim_columns(fcfg["horizons"])
+        weather_train = splits.train.dropna(subset=needed)   # forecast archive starts in 2024
+        print(f"Weather-aware training samples: {len(weather_train)}")
+        wr = WeatherRidge(fcfg["horizons"]).fit(weather_train, splits.val, cfg["nwp"]["ridge_alphas"])
+        wr.calibrate(splits.val, cfg["uncertainty"]["interval"])
+        wr.meta.update({"nwp_model": cfg["nwp"]["model"], "split": cfg["split"],
+                        "n_train": len(weather_train),
+                        "trained_at": pd.Timestamp.now(tz="UTC").isoformat()})
+        models_dir = Path(cfg["models_dir"])
+        models_dir.mkdir(parents=True, exist_ok=True)
+        wr.save(models_dir / "weather_ridge.json")
+        results.append(evaluate(y_test, wr.predict(splits.test), "Weather-aware Ridge"))
+        _, lo, hi = wr.predict_interval(splits.test)
+        interval_metrics(y_test, lo, hi, "weather_ridge:calibrated",
+                         cfg["uncertainty"]["interval"]).to_csv(reports / "intervals_weather.csv", index=False)
 
     out = add_skill(pd.concat(results, ignore_index=True))
     out.to_csv(reports / "results_baselines.csv", index=False)

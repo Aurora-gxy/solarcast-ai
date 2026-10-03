@@ -54,6 +54,23 @@ def to_daily_calendar(raw: pd.DataFrame, max_fill_gap: int = 2) -> pd.DataFrame:
     return daily[["solar_obs", "solar_input", "bad_quality", "missing_row", "was_filled"]]
 
 
+def load_open_meteo(data_dir: str | Path) -> pd.DataFrame:
+    """Observed daily radiation downloaded by `solarcast.download`, in the raw-table layout."""
+    path = Path(data_dir) / "observed_daily.csv"
+    if not path.exists():
+        raise FileNotFoundError(f"{path} not found. Run: python -m solarcast.download")
+    obs = pd.read_csv(path, parse_dates=["date"])
+    raw = pd.DataFrame({"date": obs["date"], "solar_t": obs["shortwave_radiation_sum"]})
+    raw["bad_quality"] = raw["solar_t"].isna().astype(int)
+    raw = raw.sort_values("date").reset_index(drop=True)
+    validate_raw(raw)
+    return raw
+
+
 def load_daily(cfg: dict) -> pd.DataFrame:
-    raw = load_raw(cfg["data"]["raw_dir"], cfg["data"]["pattern"])
-    return to_daily_calendar(raw, cfg["data"]["max_fill_gap"])
+    dcfg = cfg["data"]
+    if dcfg.get("source", "csv") == "open_meteo":
+        raw = load_open_meteo(dcfg["dir"])
+    else:
+        raw = load_raw(dcfg["raw_dir"], dcfg["pattern"])
+    return to_daily_calendar(raw, dcfg["max_fill_gap"])

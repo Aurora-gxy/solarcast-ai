@@ -1,5 +1,9 @@
+# Course benchmark: 24 years of daily radiation, history-only inputs.
 # All paths are relative to the project root.
 data:
+  source: csv
+  unit: "W/m²"
+  site: Course benchmark
   raw_dir: data/raw
   pattern: "daily_solar_*.csv"
   max_fill_gap: 2          # forward-fill input gaps of at most this many days

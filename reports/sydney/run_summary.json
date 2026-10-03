@@ -1,0 +1,20 @@
+{
+  "best_model": "mlp",
+  "best_seed": 0,
+  "n_train": 9208,
+  "n_val": 176,
+  "n_test": 353,
+  "test_period": [
+    "2025-10-01",
+    "2026-09-20"
+  ],
+  "macro_rmse_seed_std": {
+    "Attention MLP": 0.014873328939490543,
+    "Multi-output MLP": 0.03660301203074024
+  },
+  "mean_train_seconds": {
+    "Attention MLP": 4.95,
+    "Multi-output MLP": 1.53
+  },
+  "trained_at": "2026-10-03T18:19:41.566826+00:00"
+}

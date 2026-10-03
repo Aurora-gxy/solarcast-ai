@@ -1,0 +1,53 @@
+# Sydney experiment: public Open-Meteo data, with archived weather forecasts.
+# Download the data first:  python -m solarcast.download
+data:
+  source: open_meteo
+  dir: data/open_meteo
+  unit: "MJ/m²"
+  site: Sydney
+  max_fill_gap: 2
+
+nwp:
+  model: best_match          # which archived weather model to use as input
+  ridge_alphas: [0.1, 1.0, 10.0, 100.0]
+
+features:
+  n_lags: 7
+  rolling_window: 7
+  horizons: 7
+
+split:                        # split by the forecast origin date t
+  train_end: "2025-03-31"     # history-only models train on 2000 onwards;
+  val_end: "2025-09-30"       # weather-aware models on 2024-01 onwards (forecast archive start)
+  test_start: "2025-10-01"    # test covers one full seasonal cycle
+
+baselines:
+  climatology_smooth_days: 15
+  ridge_alphas: [0.1, 1.0, 10.0, 100.0, 1000.0]
+  xgboost:
+    n_estimators: 600
+    learning_rate: 0.03
+    max_depth: 3
+    subsample: 0.8
+    colsample_bytree: 0.8
+    early_stopping_rounds: 40
+
+model:
+  hidden: [128, 64]
+  dropout: 0.2
+  attention_dim: 16
+  lr: 0.001
+  weight_decay: 0.0001
+  batch_size: 64
+  max_epochs: 200
+  patience: 15
+  seeds: [0, 1, 2, 3, 4]
+  architectures: [mlp, attention]
+
+uncertainty:
+  mc_samples: 100
+  interval: 0.80
+
+seed: 42
+models_dir: models/sydney
+reports_dir: reports/sydney

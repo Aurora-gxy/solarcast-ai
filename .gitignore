@@ -11,8 +11,8 @@ __pycache__/
 # Data and model artefacts (raw data may be licence-restricted)
 data/raw/
 data/processed/
-models/*.pt
-models/*.joblib
+models/**/*.pt
+models/**/*.joblib
 
 # Secrets
 .env
