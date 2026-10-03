@@ -2,9 +2,14 @@
 
 Seven-day solar radiation forecasting for Sydney, with honest baselines and checked uncertainty.
 
-> Status: work in progress. Data pipeline, baselines, neural models, weather-aware
-> model, interval calibration and a local dashboard are done. Live "next 7 days"
-> forecasts and online deployment are not yet included.
+[![CI](https://github.com/Aurora-gxy/solarcast-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/Aurora-gxy/solarcast-ai/actions/workflows/ci.yml)
+
+The dashboard has two modes: **Live**, which pulls today's weather forecast and predicts
+today plus the next six days, and **Replay**, which shows what the model would have said
+on any past date next to what actually happened.
+
+> Status: work in progress. Online deployment, product documents and the natural-language
+> summary are not yet included.
 
 ## Key result
 
@@ -43,6 +48,7 @@ python -m solarcast.download                                   # public Sydney d
 python -m solarcast.run_baselines --config configs/sydney.yaml # baselines + weather-aware model
 python -m solarcast.train --config configs/sydney.yaml         # neural models, 5 seeds each
 streamlit run app/streamlit_app.py                             # dashboard at http://localhost:8501
+python -m solarcast.live                                       # live 7-day forecast in the terminal
 pytest -q
 ```
 
@@ -85,3 +91,6 @@ model stores its interval as a share of the seasonal normal.
   (431 days) and are tested on a single year.
 - Skill drops after day 5; days 6–7 are only about 17% better than the seasonal normal.
 - Train, validation and test periods cover different seasons, which affects interval calibration.
+- Live mode uses the newest weather-model run, which is slightly fresher than the 1-to-7-day
+  lead forecasts the model was trained on, and the weather model's own analysis for the past
+  week in place of reanalysis. Live accuracy has not been measured separately.

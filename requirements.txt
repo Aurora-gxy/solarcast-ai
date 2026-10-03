@@ -1,0 +1,9 @@
+# Runtime dependencies of the dashboard only (used by Streamlit Community Cloud).
+# The deployed app serves the weather-aware model, which needs no PyTorch,
+# scikit-learn or XGBoost. For development use:  pip install -e ".[all]"
+numpy>=1.24
+pandas>=2.0
+pyyaml>=6.0
+requests>=2.31
+plotly>=5.18
+streamlit>=1.50

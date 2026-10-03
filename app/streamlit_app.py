@@ -89,6 +89,14 @@ def get_weather_model(path: str, mtime: float) -> WeatherRidge:
     return WeatherRidge.load(path)
 
 
+@st.cache_data(ttl=3600, show_spinner="Fetching the latest weather forecast...")
+def get_live(config_path: str):
+    """Inputs for a forecast starting today. Refreshed at most once an hour."""
+    from solarcast.live import live_inputs
+    cfg, daily, _ = get_data(config_path)
+    return live_inputs(cfg["data"]["site_coords"], fit_climatology(daily, cfg), cfg["features"]["horizons"])
+
+
 def read_report(reports_dir: Path, name: str):
     path = reports_dir / name
     if not path.exists():
@@ -136,15 +144,44 @@ with tab_forecast:
         st.warning("No trained model found. Run `python -m solarcast.run_baselines` and "
                    "`python -m solarcast.train` with this dataset's config.")
     else:
+        live_possible = "Weather-aware Ridge" in choices and "site_coords" in cfg["data"]
+        mode = "Replay a past date"
+        if live_possible:
+            mode = st.radio("Mode", ["Live: today onwards", "Replay a past date"], horizontal=True,
+                            help="Live uses the weather forecast published today. Replay shows what the "
+                                 "model would have said on a past date, next to what actually happened.")
+        live_row = recent = None
+        if mode.startswith("Live"):
+            try:
+                live_row, recent = get_live(available_sets[dataset])
+            except Exception as exc:   # network or API problem: fall back instead of failing
+                st.warning(f"Live weather data is unavailable right now ({exc}). Showing replay mode instead.")
+                mode = "Replay a past date"
+        is_live = live_row is not None
+
         c1, c2, c3 = st.columns([1.2, 1.2, 1.6])
-        choice = c2.selectbox("Model", list(choices))
+        choice = c2.selectbox("Model", ["Weather-aware Ridge"] if is_live else list(choices), disabled=is_live)
         is_weather = choice == "Weather-aware Ridge"
-        needed = feature_names() + clim_columns() + (nwp_columns() if is_weather else [])
-        usable_all = feats.dropna(subset=needed)
-        origin = pd.Timestamp(c1.date_input(
-            "Forecast made on", value=usable_all.index.max().date(),
-            min_value=usable_all.index.min().date(), max_value=usable_all.index.max().date(),
-            help="Pick a past date to replay the forecast and compare it with what happened."))
+        if is_live:
+            row = live_row
+            used_origin = row.index[0]
+            c1.markdown(f"**Forecast for**  \n{(used_origin + pd.Timedelta(days=1)).strftime('%a %d %b %Y')} "
+                        f"and the following 6 days")
+        else:
+            needed = feature_names() + clim_columns() + (nwp_columns() if is_weather else [])
+            usable_all = feats.dropna(subset=needed)
+            origin = pd.Timestamp(c1.date_input(
+                "Forecast made on", value=usable_all.index.max().date(),
+                min_value=usable_all.index.min().date(), max_value=usable_all.index.max().date(),
+                help="Pick a past date to replay the forecast and compare it with what happened."))
+            usable = usable_all.loc[:origin]
+            if usable.empty:
+                st.error("Not enough history before this date.")
+                st.stop()
+            row = usable.iloc[[-1]]
+            used_origin = row.index[0]
+            if used_origin != origin:
+                st.info(f"{origin.date()} has incomplete inputs. Showing the forecast from {used_origin.date()}.")
         if is_weather:
             method_label = "Calibrated"
             c3.markdown("**80% interval**  \nSized from validation errors, scaled by season")
@@ -152,15 +189,6 @@ with tab_forecast:
             method_label = c3.radio("80% interval", ["Calibrated", "MC Dropout"], horizontal=True,
                                     help="Calibrated intervals are sized from validation errors. "
                                          "MC Dropout intervals are shown for comparison and are too narrow.")
-
-        usable = usable_all.loc[:origin]
-        if usable.empty:
-            st.error("Not enough history before this date.")
-            st.stop()
-        row = usable.iloc[[-1]]
-        used_origin = row.index[0]
-        if used_origin != origin:
-            st.info(f"{origin.date()} has incomplete inputs. Showing the forecast from {used_origin.date()}.")
 
         path = choices[choice]
         if is_weather:
@@ -178,7 +206,7 @@ with tab_forecast:
 
         dates = used_origin + pd.to_timedelta(np.arange(1, 8), unit="D")
         clim = row[clim_columns()].to_numpy()[0]
-        actual = daily["solar_obs"].reindex(dates).to_numpy()
+        actual = np.full(7, np.nan) if is_live else daily["solar_obs"].reindex(dates).to_numpy()
         today = float(row["solar_t"].iloc[0])
 
         # Plain-language headline first, chart second.
@@ -198,26 +226,28 @@ with tab_forecast:
         else:
             reliability = "Treat days 2–7 as a seasonal estimate: this model has little skill beyond one day."
         st.info(
-            f"**Next 7 days:** radiation is expected to {trend} today's level ({today:.1f} {unit}), "
+            f"**{'Today and the next 6 days' if is_live else 'Next 7 days'}:** radiation is expected to {trend} "
+            f"{'yesterday' if is_live else 'today'}'s level ({today:.1f} {unit}), "
             f"averaging **{mean.mean():.1f}**, which is {abs(vs_normal):.0f}% "
             f"{'above' if vs_normal >= 0 else 'below'} the seasonal normal. "
             f"Lowest expected day: **{dates[low_day].strftime('%a %d %b')}** ({mean[low_day]:.1f}). {reliability}")
 
         m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Today (observed input)", f"{today:.1f}")
-        m2.metric("7-day mean forecast", f"{mean.mean():.1f}", f"{change:+.0f}% vs today")
-        m3.metric("Lowest expected day", f"{dates[low_day].strftime('%a %d %b')} · {mean[low_day]:.1f}")
+        m1.metric("Yesterday (model analysis)" if is_live else "Today (observed input)", f"{today:.1f}")
+        m2.metric("7-day mean forecast", f"{mean.mean():.1f}",
+                  f"{change:+.0f}% vs {'yesterday' if is_live else 'today'}")
+        m3.metric(f"Lowest expected day ({mean[low_day]:.1f})", dates[low_day].strftime("%a %d %b"))
         m4.metric("Interval half-width, day 1 → day 7",
                   f"±{(upper[0] - lower[0]) / 2:.1f} → ±{(upper[-1] - lower[-1]) / 2:.1f}")
 
-        hist = daily["solar_obs"].loc[used_origin - pd.Timedelta(days=20): used_origin]
+        hist = recent if is_live else daily["solar_obs"].loc[used_origin - pd.Timedelta(days=20): used_origin]
         fmt = "%{y:.1f}"
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=dates, y=upper, mode="lines", line=dict(width=0),
                                  showlegend=False, hoverinfo="skip"))
         fig.add_trace(go.Scatter(x=dates, y=lower, mode="lines", line=dict(width=0), fill="tonexty",
                                  fillcolor="rgba(42,120,214,0.18)", name="80% interval", hovertemplate=fmt))
-        fig.add_trace(go.Scatter(x=hist.index, y=hist.values, mode="lines+markers", name="Observed history",
+        fig.add_trace(go.Scatter(x=hist.index, y=hist.values, mode="lines+markers", name="Recent days (weather-model analysis)" if is_live else "Observed history",
                                  line=dict(color=MUTED, width=2), marker=dict(size=5), hovertemplate=fmt))
         fig.add_trace(go.Scatter(x=dates, y=clim, mode="lines", name="Seasonal normal",
                                  line=dict(color=MUTED, width=2, dash="dot"), hovertemplate=fmt))
@@ -238,6 +268,10 @@ with tab_forecast:
         table["Actual"] = actual
         with st.expander("Forecast table"):
             st.dataframe(table.round(1), hide_index=True, width="stretch")
+        if is_live:
+            st.caption("Live mode uses today's weather forecast from Open-Meteo and the weather model's own "
+                       "analysis for the past week, because reanalysis data arrives about five days late. "
+                       "Refreshed hourly.")
         st.caption(f"{trained_note} Not for trading or safety-critical decisions.")
 
 # --------------------------------------------------------------------------- Models

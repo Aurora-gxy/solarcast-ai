@@ -5,6 +5,7 @@ data:
   dir: data/open_meteo
   unit: "MJ/m²"
   site: Sydney
+  site_coords: {latitude: -33.87, longitude: 151.21, timezone: Australia/Sydney}
   max_fill_gap: 2
 
 nwp:
